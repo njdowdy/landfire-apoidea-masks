@@ -1,0 +1,20 @@
+---
+title: "Landfire Apoidea Masking"
+author: "Nicolas J. Dowdy; Lindsie McCabe"
+date: "3/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Procedure
+
+1. Get landfire classification for each observation
+2. Use dplyr to count the landfire classes aggregated by species
+3. For each species, limit the landfire classes to those above 10% and sum the rasters together
+4. Mask the range raster for each species by the landfire raster from step #3
+5. Save the resulting range raster for each species
+6. Repeat for different resolutions
+7. Profit.
