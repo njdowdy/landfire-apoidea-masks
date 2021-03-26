@@ -11,7 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Procedure
 
-0. Import landfire rasters
 1. Get landfire classification for each observation
 2. Use dplyr to count the landfire classes aggregated by species
 3. For each species, limit the landfire classes to those above 10% and sum the rasters together
