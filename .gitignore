@@ -1,9 +1,14 @@
+# local files
+/extras/*
+/input/landcover_files/*
+
 # History files
 .Rhistory
 .Rapp.history
 
 # Session Data files
 .RData
+.Rproj
 
 # User-specific files
 .Ruserdata
