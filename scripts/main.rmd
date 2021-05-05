@@ -31,6 +31,14 @@ abundant_cutoff = 7500
 7. Profit.
 
 ```{r}
+# load libraries for this chunk
+library(tidyr)
+library(dplyr)
+library(raster) # install libxt-dev
+library(rgdal) # install libgdal-dev
+library(rgeos) # install libgeos-dev
+library(stringr)
+
 # function for generating paths to raster files
 path2file <- function(dataset=NULL, parent=NULL, type=NULL) {
   if(is.null(parent)){
@@ -89,14 +97,6 @@ developed_grid <- raster(path2file('developed', 'landfire', 'grid'))
 <!-- you will then want to match with the evt key (I'll also put that in dropbox) and then you'll want to use the "EVT_LF" column to filter and figure out what land types to use for that species based on how many times the land type is present. -->
 
 ```{r}
-# load libraries for this chunk
-library(tidyr)
-library(dplyr)
-library(raster) # install libxt-dev
-library(rgdal) # install libgdal-dev
-library(rgeos) # install libgeos-dev
-library(stringr)
-
 ## read in the shape files and crop
 usa=readOGR(path2file(parent='usa', dataset='usa'))
 globe=readOGR(path2file(parent='usa', dataset='continents'))
@@ -156,7 +156,7 @@ for(taxon in taxa) {
                        group_by(id, lat, long) %>%
                        gather(landfire_type, val, -id, -lat, -long) %>%
                        filter(val == 1) %>%
-                       select(-val) %>%
+                       dplyr::select(-val) %>%
                        arrange(id)
   
   occurrences_fixed$longlat <- paste(occurrences_fixed$long, occurrences_fixed$lat, sep='_')
