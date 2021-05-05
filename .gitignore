@@ -1,6 +1,7 @@
 # local files
-/extras/*
-/input/landcover_files/*
+extras/*
+input/landcover_files/*
+input/extracted/*
 
 # History files
 .Rhistory
