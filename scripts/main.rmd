@@ -1,12 +1,23 @@
 ---
 title: "Landfire Apoidea Masking"
-author: "Nicolas J. Dowdy; Lindsie McCabe"
-date: "3/15/2021"
+author: "Nicolas J. Dowdy"
+date: "2021-05-04"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+set.seed(12345) # set seed for code reproducibility
+# set resource locations
+setwd("scripts/")
+landfire_input = "../input/LF_140EVT.csv"
+# dblbnd.adf (aka bnd.adf) -- The boundary file contains the minimum and maximum x,y coordinates for an ESRI_grid. The boundary is a rectangle that encompasses the cells of a grid; it is stored in map coordinates. All grid BNDs are stored in double precision. This file will have a corresponding .nit and .data files in the INFO directory of an ESRI_grid. This information is stored in INFO format. https://www.loc.gov/preservation/digital/formats/fdd/fdd000281.shtml
+boundary_grid = "../input/dblbnd.adf"
+landfire_shapes = "../input/extracted/landfire-files"
+raster_location = "../input/extracted/range-data-rasters"
+shape_files_location = "../input/extracted/shape-files"
+# set variables
+abundant_cutoff = 7500
 ```
 
 ## Procedure
@@ -18,3 +29,160 @@ knitr::opts_chunk$set(echo = TRUE)
 5. Save the resulting range raster for each species
 6. Repeat for different resolutions
 7. Profit.
+
+```{r}
+# function for generating paths to raster files
+path2file <- function(dataset=NULL, parent=NULL, type=NULL) {
+  if(is.null(parent)){
+    print('Provide valid parent.')
+  } else if(is.null(dataset)){
+    print('Provide valid dataset.')
+  } else if(!(parent %in% c('usa', 'landfire'))) {
+    print('Provide valid parent.')
+  } else {
+    if(parent == 'landfire') {
+        parent = landfire_shapes
+        if(is.null(type)){
+          dataset = dataset
+        } else if(type == 'grid') {
+          dataset = paste(dataset,'_raster.grd',sep='')
+        }
+    } else if(parent == 'usa') {
+        parent = shape_files_location
+    }
+    file.path(parent, dataset)
+  }
+}
+
+# load landfire metadata
+landfire = read.csv(landfire_input)
+
+# define and load shape files for each landfire type being considered
+barren_shape <- readOGR(path2file('barren', 'landfire'))
+sparse_shape <- readOGR(path2file('sparse', 'landfire'))
+tree_shape <- readOGR(path2file('tree', 'landfire'))
+herb_shape <- readOGR(path2file('herb', 'landfire'))
+shrub_shape <- readOGR(path2file('shrub', 'landfire'))
+agriculture_shape <- readOGR(path2file('agriculture', 'landfire'))
+developed_shape <- readOGR(path2file('developed', 'landfire'))
+
+# define and load raster grids
+barren_grid <- raster(path2file('barren', 'landfire', 'grid'))
+sparse_grid <- raster(path2file('sparse', 'landfire', 'grid'))
+tree_grid <- raster(path2file('tree', 'landfire', 'grid'))
+herb_grid <- raster(path2file('herb', 'landfire', 'grid'))
+shrub_grid <- raster(path2file('shrub', 'landfire', 'grid'))
+agriculture_grid <- raster(path2file('agriculture', 'landfire', 'grid'))
+developed_grid <- raster(path2file('developed', 'landfire', 'grid'))
+
+# TODO: ensure raster grids are compatible with north american / range grids
+
+
+```
+
+
+<!-- r=raster("dblbnd.adf") -->
+<!-- Richness=spTransform(richness,CRS(proj4string(r))) -->
+<!-- values <- extract(r,richness) -->
+<!-- evt <- cbind.data.frame(coordinates(richness),values) -->
+
+<!-- you will then want to match with the evt key (I'll also put that in dropbox) and then you'll want to use the "EVT_LF" column to filter and figure out what land types to use for that species based on how many times the land type is present. -->
+
+```{r}
+# load libraries for this chunk
+library(tidyr)
+library(dplyr)
+library(raster) # install libxt-dev
+library(rgdal) # install libgdal-dev
+library(rgeos) # install libgeos-dev
+library(stringr)
+
+## read in the shape files and crop
+usa=readOGR(path2file(parent='usa', dataset='usa'))
+globe=readOGR(path2file(parent='usa', dataset='continents'))
+NAm=globe[globe$CONTINENT=='North America',]
+NAm=crop(NAm,extent(-165,-60,8,85))
+usaWGS=spTransform(usa,CRS(proj4string(NAm)))
+
+# read in occurrence data
+test <- read.csv('../input/test_df_small.csv')
+
+# fix scientificName formatting
+test$scientificName <- gsub(' ', '_', test$scientificName)
+
+# make a lat/long combo for grabbing unique values
+test$longlat <- paste(test$finalLongitude, test$finalLatitude, sep='_')
+  
+# define taxa
+taxa <- unique(test$scientificName) # get a list of unique taxa
+grd_files <- list.files(raster_location, pattern = "\\.grd$") # generate a list of raster locations
+name <- c() # allocate as a temporary list
+
+taxon = taxa[1] # testing
+
+for(taxon in taxa) {
+  raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
+
+  # load range map
+  taxon_raster = raster(paste(raster_location, raster_file, sep="/")) # load the raster
+  raster_usawgs = mask(taxon_raster, usaWGS) # mask the raster to the USA shapefile
+  raster_nam = mask(taxon_raster, NAm) # mask the raster to the North America shapefile
+  plot(raster_nam) # plot the raster as sanity check
+  points(x=points$long, y=points$lat, pch=16, size=3)
+  
+  # get unique lat/long values for taxon
+  taxon_test <- test[which(test$scientificName == taxon),]
+  points <- as.data.frame(unique(taxon_test$longlat))
+  colnames(points) <- 'longlat'
+  points <- as.data.frame(str_split_fixed(points$longlat, "_", 2))
+  colnames(points) <- c('long', 'lat')
+  points$lat <- as.numeric(points$lat)
+  points$long <- as.numeric(points$long)
+  
+  # assign landfire types to occurrences
+  occurrences <- points
+  barren<-cbind(raster::extract(barren_grid, occurrences, df = T), occurrences)$layer
+  sparse<-cbind(raster::extract(sparse_grid, occurrences, df = T), occurrences)$layer
+  tree<-cbind(raster::extract(tree_grid, occurrences, df = T), occurrences)$layer
+  herb<-cbind(raster::extract(herb_grid, occurrences, df = T), occurrences)$layer
+  shrub<-cbind(raster::extract(shrub_grid, occurrences, df = T), occurrences)$layer
+  agriculture<-cbind(raster::extract(agriculture_grid, occurrences, df = T), occurrences)$layer
+  developed<-cbind(raster::extract(developed_grid, occurrences, df = T), occurrences)$layer
+  occurrences$id <- as.numeric(rownames(occurrences))
+  occurrence_types <- cbind(occurrences, barren, sparse, tree, herb, shrub, agriculture, developed)
+  occurrence_types$none <- abs(rowSums(occurrence_types[,4:10], na.rm=TRUE)-1)
+  
+  occurrences_fixed <- occurrence_types %>%
+                       group_by(id, lat, long) %>%
+                       gather(landfire_type, val, -id, -lat, -long) %>%
+                       filter(val == 1) %>%
+                       select(-val) %>%
+                       arrange(id)
+  
+  occurrences_fixed$longlat <- paste(occurrences_fixed$long, occurrences_fixed$lat, sep='_')
+  taxon_test_merged <- merge(occurrences_fixed, taxon_test, by = 'longlat')
+  
+  # count up occurrences within each landfire type
+  landfire_count <- taxon_test_merged %>%
+  group_by(landfire_type) %>%
+  summarise(count = n() ) %>%
+  mutate( prop = 100*(count / sum(count)) )
+  
+  # determine cutoff for landfire inclusion
+  if(sum(landfire_count$count)>abundant_cutoff){
+    landfire_cutoff = 5
+  } else {
+    landfire_cutoff = 10
+  }
+  
+  # determine which landfire types meet cutoff
+  landfire_keepers <- landfire_count[which(landfire_count$prop>5),]$landfire_type
+  
+  # TODO: stack() grids of landfire_keepers
+  
+  # TODO: mask() taxon range with the landfire_keepers
+  
+}
+
+```
+
