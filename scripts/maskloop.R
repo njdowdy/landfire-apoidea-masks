@@ -60,5 +60,5 @@ for (i in c(1:1190)){
   spRange = raster(paste(paste("C:/Users/linds/Dropbox/Symbiota_database/Gap_analysis copy/Ranges/Halictidae/110km",paste(spList[i,2]),sep="/"),"raster.grd",sep="_"))
   spRangeN = crop(spRange, Mask)
 
-  writeRaster = (spRangeN, file = paste(paste("C:/Users/linds/Dropbox/Symbiota_database/Gap_analysis copy/Ranges/Mask/Halictidae/110km",paste(spList[i,2]),sep="/"),"raster.grd",sep="_"))
+  writeRaster (spRangeN, file = paste(paste("C:/Users/linds/Dropbox/Symbiota_database/Gap_analysis copy/Ranges/Mask/Halictidae/110km",paste(spList[i,2]),sep="/"),"raster.grd",sep="_"))
 }
